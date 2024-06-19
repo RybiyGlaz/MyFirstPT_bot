@@ -1,0 +1,56 @@
+services:
+  bot:
+    container_name: bot
+    image: bot_image
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - pg_logs:/var/log/
+    env_file: 
+      - .env
+    networks:
+      - network
+    depends_on:
+      - db
+
+  db:
+    container_name: db
+    image: db_image
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - pg_logs:/var/log/
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    env_file: 
+      - .env
+    networks:
+      - network
+
+  db_repl:
+    container_name: db_repl
+    image: db_repl_image
+    build:
+      context: ./db_repl
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    env_file: 
+      - .env
+    networks:
+      - network
+    depends_on:
+      - db
+
+volumes:
+  pg_data:
+  pg_logs:
+
+networks:
+  network:
+    driver: bridge
