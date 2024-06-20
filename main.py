@@ -90,9 +90,9 @@ def get_auths_command(update: Update, context):
     ssh_command = "last -n 10"
     return execute_ssh_command(update, context, ssh_command)
 
-def get_critical_command(update: Update, context):
-    ssh_command = "journalctl -p crit | tail -n 5"
-    return execute_ssh_command(update, context, ssh_command)
+def get_critical(update, context):
+    run_ssh_command(update, context, 'Последние 5 критических события',
+                    'journalctl -p crit | tail -n 5')
 
 
 def get_ps_command(update: Update, context):
