@@ -26,12 +26,6 @@
         state: present
         executable: pip3
 
-    - name: Clone TG Bot repository
-      git:
-        repo: "{{ GIT_URL }}"
-        dest: "{{ WORKDIR }}"
-        version: bot
-
     - name: Install python3 and additional packages
       apt:
         name:
@@ -39,7 +33,25 @@
           - python3-pip
           - python3-venv
         state: present
-    
+
+    - name: Ensure work directory is clean
+      file:
+        path: "{{ WORKDIR }}"
+        state: absent
+      become: true
+
+    - name: Create work directory
+      file:
+        path: "{{ WORKDIR }}"
+        state: directory
+      become: true
+
+    - name: Clone TG Bot repository
+      git:
+        repo: "{{ GIT_URL }}"
+        dest: "{{ WORKDIR }}"
+        version: bot
+
     - name: Download main.py from GitHub
       get_url:
         url: "https://raw.githubusercontent.com/RybiyGlaz/MyFirstPT_bot/bot/main.py"
