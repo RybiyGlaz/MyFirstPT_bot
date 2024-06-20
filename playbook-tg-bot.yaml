@@ -222,8 +222,10 @@
 
     - name: Ensure log file is readable
       file:
-        path: /var/log/postgresql/postgresql-{{ POSTGRES_VERSION }}-main.log
+        path: /var/log/postgresql/postgresql-14-main.log
         mode: '0644'
+        owner: postgres
+        group: postgres
 
     - name: Start postgresql
       systemd:
