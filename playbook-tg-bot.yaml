@@ -154,16 +154,23 @@
         group: "{{ DB_USER }}"
         mode: '0644'
 
-    - name: Replace variables in init.sql
+    - name: Replace DB_DATABASE in init.sql
       replace:
         path: /tmp/init.sql
-        replacements:
-          - regexp: "DB_DATABASE"
-            replace: "{{ DB_DATABASE }}"
-          - regexp: "DB_REPL_USER"
-            replace: "{{ DB_REPL_USER }}"
-          - regexp: "DB_REPL_PASSWORD"
-            replace: "{{ DB_REPL_PASSWORD }}"
+        regexp: "DB_DATABASE"
+        replace: "{{ DB_DATABASE }}"
+
+    - name: Replace DB_REPL_USER in init.sql
+      replace:
+        path: /tmp/init.sql
+        regexp: "DB_REPL_USER"
+        replace: "{{ DB_REPL_USER }}"
+
+    - name: Replace DB_REPL_PASSWORD in init.sql
+      replace:
+        path: /tmp/init.sql
+        regexp: "DB_REPL_PASSWORD"
+        replace: "{{ DB_REPL_PASSWORD }}"
 
     - name: Run init.sql
       command: /usr/bin/psql -a -f /tmp/init.sql
