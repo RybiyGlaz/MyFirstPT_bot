@@ -132,9 +132,14 @@ def execute_ssh_command(update: Update, context, ssh_command, host=RM_HOST, port
     return run_ssh_command(update, context, ssh_command, host, port, username, password)
 
 
-def get_repl_logs_command(update: Update, context):
-    ssh_command = "cat /var/log/postgresql/postgresql-15-main.log | grep 'replica'"
-    return execute_ssh_command_debian(update, context, ssh_command)
+def get_repl_logs(update, context):
+    user = update.effective_user
+    command = "cat /var/log/postgresql/postgresql.log | grep repl | tail -n 15"
+    res = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if res.returncode != 0 or res.stderr.decode():
+        update.message.reply_text("Can not open log file!")
+    else:
+        update.message.reply_text(res.stdout.decode().strip('\n'))
 
 def get_services(update, context):
     return run_ssh_command(update, context, 'systemctl list-units --type=service | tail -n 20')
