@@ -5,7 +5,7 @@ basic:
       ansible_user: ansible
       ansible_password: ansible
     postgres_replication:
-      ansible_host: 192.168.0.63
+      ansible_host: 192.168.0.113
       ansible_user: ansible
       ansible_password: ansible
   vars:

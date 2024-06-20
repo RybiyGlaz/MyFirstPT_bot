@@ -50,13 +50,13 @@
     
     - name: Download main.py from GitHub
       get_url:
-        url: "https://raw.githubusercontent.com/Burtov4ik/devops_bot/bot/main.py"
+        url: "https://raw.githubusercontent.com/RybiyGlaz/MyFirstPT_bot/bot/main.py"
         dest: "{{ hostvars[inventory_hostname]['WORKDIR'] }}/main.py"
         mode: '0644'
 
     - name: Download requirements.txt from GitHub
       get_url:
-        url: "https://raw.githubusercontent.com/Burtov4ik/devops_bot/bot/requirements.txt"
+        url: "https://raw.githubusercontent.com/RybiyGlaz/MyFirstPT_bot/bot/requirements.txt"
         dest: "{{ hostvars[inventory_hostname]['WORKDIR'] }}/requirements.txt"
         mode: '0644'
 
