@@ -134,12 +134,32 @@ def execute_ssh_command(update: Update, context, ssh_command, host=RM_HOST, port
 
 def get_repl_logs(update, context):
     user = update.effective_user
-    command = "cat /var/log/postgresql/postgresql.log | grep repl | tail -n 15"
+    log_file_path = "/var/log/postgresql/postgresql-14-main.log"  # Убедитесь, что путь к файлу логов указан правильно
+    command = f"cat {log_file_path} | grep repl | tail -n 15"
     res = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
     if res.returncode != 0 or res.stderr.decode():
-        update.message.reply_text("Can not open log file!")
+        error_message = res.stderr.decode().strip()
+        update.message.reply_text(f"Can not open log file! Error: {error_message}")
     else:
-        update.message.reply_text(res.stdout.decode().strip('\n'))
+        log_output = res.stdout.decode().strip('\n')
+        if log_output:
+            update.message.reply_text(log_output)
+        else:
+            update.message.reply_text("No replication logs found.")
+
+# Дополнительная функция для диагностики прав доступа и существования файла
+def check_log_file(update, context):
+    log_file_path = "/var/log/postgresql/postgresql-14-main.log"  # Убедитесь, что путь к файлу логов указан правильно
+    command = f"ls -l {log_file_path}"
+    res = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+    if res.returncode != 0 or res.stderr.decode():
+        error_message = res.stderr.decode().strip()
+        update.message.reply_text(f"Log file check failed! Error: {error_message}")
+    else:
+        update.message.reply_text(res.stdout.decode().strip())
+
 
 def get_services(update, context):
     return run_ssh_command(update, context, 'systemctl list-units --type=service | tail -n 20')
