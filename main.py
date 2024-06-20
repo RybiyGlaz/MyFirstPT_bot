@@ -90,9 +90,14 @@ def get_auths_command(update: Update, context):
     ssh_command = "last -n 10"
     return execute_ssh_command(update, context, ssh_command)
 
-def get_critical_command(update: Update, context):
+def get_critical_command(update, context):
     ssh_command = "journalctl -p crit | tail -n 5"
-    return execute_ssh_command(update, context, ssh_command)
+    result = execute_ssh_command(update, context, ssh_command)
+    if "-- No entries --" in result:
+        update.message.reply_text("No critical entries found.")
+    else:
+        update.message.reply_text(result)
+
 
 def get_ps_command(update: Update, context):
     ssh_command = "ps"
