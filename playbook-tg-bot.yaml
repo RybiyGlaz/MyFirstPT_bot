@@ -14,33 +14,25 @@
           - python3-psycopg2
         state: present
         update_cache: yes
+
     - name: apt cache update
       apt:
         update_cache: yes
         cache_valid_time: 172800
-      become: yes
+
     - name: Install psycopg2 via pip
       pip:
         name: psycopg2-binary
         state: present
         executable: pip3
 
-    - name: git install
-      apt:
-        name: git
-        state: present
-
     - name: Clone TG Bot repository
-      command: git clone {{ hostvars[inventory_hostname]['GIT_URL'] }} "{{ hostvars[inventory_hostname]['WORKDIR'] }}"
-      args:
-        creates: "{{ hostvars[inventory_hostname]['WORKDIR'] }}"  # Это предотвратит повторное клонирование, если папка уже существует
-      become: true
-      become_method: sudo
-      become_user: root
-      vars:
-        ansible_become_password: ansible
+      git:
+        repo: "{{ GIT_URL }}"
+        dest: "{{ WORKDIR }}"
+        version: bot
 
-    - name: Install python3 and additionals
+    - name: Install python3 and additional packages
       apt:
         name:
           - python3
@@ -51,80 +43,75 @@
     - name: Download main.py from GitHub
       get_url:
         url: "https://raw.githubusercontent.com/RybiyGlaz/MyFirstPT_bot/bot/main.py"
-        dest: "{{ hostvars[inventory_hostname]['WORKDIR'] }}/main.py"
+        dest: "{{ WORKDIR }}/main.py"
         mode: '0644'
 
     - name: Download requirements.txt from GitHub
       get_url:
         url: "https://raw.githubusercontent.com/RybiyGlaz/MyFirstPT_bot/bot/requirements.txt"
-        dest: "{{ hostvars[inventory_hostname]['WORKDIR'] }}/requirements.txt"
+        dest: "{{ WORKDIR }}/requirements.txt"
         mode: '0644'
 
     - name: Install python packages from requirements.txt
       pip:
-        requirements: "{{ hostvars[inventory_hostname]['WORKDIR'] }}/requirements.txt"
+        requirements: "{{ WORKDIR }}/requirements.txt"
+        executable: pip3
 
-- name: postgresql deployment and preliminary replication setup
+- name: PostgreSQL deployment and preliminary replication setup
   hosts: postgres_master
   become: true
   tasks:
-    - name: postgresql install
+    - name: Install postgresql
       apt:
         name:
-          - postgresql-14
+          - postgresql-{{ POSTGRES_VERSION }}
           - postgresql-contrib
         state: present
-        update_cache: true
+        update_cache: yes
       register: postgres_install_result
 
-    - name: check installation
+    - name: Check installation
       fail:
         msg: "Failed to install PostgreSQL"
-      when: postgres_install_result.failed
+      when: postgres_install_result is failed
 
-    - name: postgresql configuration
-      become_user: "{{ hostvars[inventory_hostname]['DB_USER']}}"
+    - name: Configure postgresql
       blockinfile:
-        path: /etc/postgresql/14/main/postgresql.conf
+        path: /etc/postgresql/{{ POSTGRES_VERSION }}/main/postgresql.conf
         block: |
           listen_addresses = '*'
-          port = {{ hostvars[inventory_hostname]['DB_PORT'] }}
+          port = {{ DB_PORT }}
           archive_mode = on
           archive_command = 'cp %p /oracle/pg_data/archive/%f'
-          max_wal_senders=10
-          wal_level=replica
+          max_wal_senders = 10
+          wal_level = replica
           wal_log_hints = on
-          log_replication_commands=on
+          log_replication_commands = on
 
-    - name: make dir /oracle/pg_data/archive
+    - name: Make archive directory
       file:
         path: /oracle/pg_data/archive
         state: directory
+        owner: "{{ DB_USER }}"
+        group: "{{ DB_USER }}"
+        recurse: yes
 
-
-    - name: chown oracle archive dir
-      file:
-        path: /oracle/pg_data/archive/
-        owner: "{{ hostvars[inventory_hostname]['DB_USER'] }}"
-        group: "{{ hostvars[inventory_hostname]['DB_USER'] }}"
-        recurse: true
-
-    - name: configuring pg_hba.conf
+    - name: Configure pg_hba.conf
       blockinfile:
-        path: "/etc/postgresql/14/main/pg_hba.conf"
+        path: /etc/postgresql/{{ POSTGRES_VERSION }}/main/pg_hba.conf
         block: |
-          local all {{ hostvars[inventory_hostname]['DB_USER'] }} peer
-          host replication all {{ hostvars[inventory_hostname]['DB_REPL_HOST'] }}/24 scram-sha-256
-          host all all {{ hostvars[inventory_hostname]['DB_HOST'] }}/32 trust
+          local all {{ DB_USER }} peer
+          host replication all {{ DB_REPL_HOST }}/24 scram-sha-256
+          host all all {{ DB_HOST }}/32 trust
 
-    - name: postgresql restart
+    - name: Restart postgresql
       systemd:
         name: postgresql
         state: restarted
 
     - name: Check if PostgreSQL is running
       become_user: postgres
-      shell: "pg_isready -q"
+      shell: pg_isready -q
       register: postgresql_running
       changed_when: false
       failed_when: false
@@ -132,145 +119,127 @@
     - name: Drop existing database
       become_user: postgres
       postgresql_db:
-        name: "{{ hostvars[inventory_hostname]['DB_DATABASE'] }}"
+        name: "{{ DB_DATABASE }}"
         state: absent
-      when: postgresql_running is success
+      when: postgresql_running is succeeded
 
     - name: Create database
       become_user: postgres
       postgresql_db:
-        name: "{{ hostvars[inventory_hostname]['DB_DATABASE'] }}"
+        name: "{{ DB_DATABASE }}"
         state: present
-      when: postgresql_running is success
+      when: postgresql_running is succeeded
 
-
-    - name: copy init.sql
+    - name: Copy init.sql
       copy:
         src: init.sql
         dest: /tmp/init.sql
 
-    - name: change permissions
+    - name: Change permissions of init.sql
       file:
         path: /tmp/init.sql
-        owner: "{{ hostvars[inventory_hostname]['DB_USER'] }}"
-        group: "{{ hostvars[inventory_hostname]['DB_USER'] }}"
+        owner: "{{ DB_USER }}"
+        group: "{{ DB_USER }}"
         mode: '0644'
 
-    - name: replace DB_DATABASE with var from env
+    - name: Replace variables in init.sql
       replace:
         path: /tmp/init.sql
-        regexp: "DB_DATABASE"
-        replace: "{{ hostvars[inventory_hostname]['DB_DATABASE'] }}"
+        replacements:
+          - regexp: "DB_DATABASE"
+            replace: "{{ DB_DATABASE }}"
+          - regexp: "DB_REPL_USER"
+            replace: "{{ DB_REPL_USER }}"
+          - regexp: "DB_REPL_PASSWORD"
+            replace: "{{ DB_REPL_PASSWORD }}"
 
-    - name: replace DB_REPL_USER with var from env
-      replace:
-        path: /tmp/init.sql
-        regexp: "DB_REPL_USER"
-        replace: "{{ hostvars[inventory_hostname]['DB_REPL_USER'] }}"
-
-    - name: replace DB_REPL_PASSWORD with var from env
-      replace:
-        path: /tmp/init.sql
-        regexp: "DB_REPL_PASSWORD"
-        replace: "{{ hostvars[inventory_hostname]['DB_REPL_PASSWORD'] }}"
-
-    - name: run init.sql
+    - name: Run init.sql
       command: /usr/bin/psql -a -f /tmp/init.sql
       become: true
-      become_user: "{{ hostvars[inventory_hostname]['DB_USER'] }}"
+      become_user: "{{ DB_USER }}"
 
-
-- name: configuring postgresql replication
+- name: Configure postgresql replication
   hosts: postgres_replication
   become: true
   tasks:
-    - name: install postgresql
+    - name: Install postgresql
       apt:
         name:
-          - postgresql-14
+          - postgresql-{{ POSTGRES_VERSION }}
           - postgresql-contrib
         state: present
-        update_cache: true
+        update_cache: yes
 
-    - name: configuring postgresql
-      become_user: postgres
+    - name: Configure postgresql
       lineinfile:
-        path: /etc/postgresql/14/main/postgresql.conf
+        path: /etc/postgresql/{{ POSTGRES_VERSION }}/main/postgresql.conf
         regexp: "^#listen_addresses ="
         line: "listen_addresses = '*'"
+      become_user: postgres
 
-    - name: postgresql stop
+    - name: Stop postgresql
       systemd:
         name: postgresql
         state: stopped
 
-    - name: remove all databases
-      command: rm -rf /var/lib/postgresql/14/main/
+    - name: Remove all databases
+      command: rm -rf /var/lib/postgresql/{{ POSTGRES_VERSION }}/main/
       become: true
-      become_user: "{{ hostvars[inventory_hostname]['DB_USER'] }}"
-    - name: set permissions for the replication directory
+
+    - name: Set permissions for the replication directory
       file:
-        path: /var/lib/postgresql/{{ hostvars[inventory_hostname]['POSTGRES_VERSION'] }}/main/
+        path: /var/lib/postgresql/{{ POSTGRES_VERSION }}/main/
         owner: postgres
         group: postgres
         recurse: yes
       become: true
 
-    - name: start replication
-      command: pg_basebackup -h {{ hostvars[inventory_hostname]['DB_HOST'] }} -D /var/lib/postgresql/14/main/ -p {{ hostvars[inventory_hostname]['DB_PORT'] }} -U {{ hostvars[inventory_hostname]['DB_REPL_USER'] }} -vP -w
+    - name: Start replication
+      command: pg_basebackup -h {{ DB_HOST }} -D /var/lib/postgresql/{{ POSTGRES_VERSION }}/main/ -p {{ DB_PORT }} -U {{ DB_REPL_USER }} -vP -w
       become: true
-      become_user: "{{ hostvars[inventory_hostname]['DB_USER'] }}"
+      become_user: postgres
       environment:
-        PGPASSWORD: "{{ hostvars[inventory_hostname]['DB_REPL_PASSWORD'] }}"
+        PGPASSWORD: "{{ DB_REPL_PASSWORD }}"
 
-    - name: chown dir /var/lib/postgresql
-      command: chown -R postgres:postgres /var/lib/postgresql/
-      become: true
-      become_user: "{{ hostvars[inventory_hostname]['DB_USER'] }}"
+    - name: Ensure log file is readable
+      file:
+        path: /var/log/postgresql/postgresql-{{ POSTGRES_VERSION }}-main.log
+        mode: '0644'
 
-    - name: start postgresql
+    - name: Start postgresql
       systemd:
         name: postgresql
         state: started
-    - name: Ensure log file is readable
-      file:
-        path: /var/log/postgresql/postgresql-{{ hostvars[inventory_hostname]['POSTGRES_VERSION'] }}-main.log
-        mode: '0644'
 
-- name: bot playbook
+- name: Bot playbook
   hosts: postgres_master
   become: yes
   tasks:
-    - name: installing python packages
+    - name: Install python packages
       pip:
         name:
           - python-telegram-bot[all]==13.7
           - paramiko
           - psycopg2-binary
           - python-dotenv
-      become: yes
 
-    - name: chown project dir
-      command: sudo chown -R {{ hostvars[inventory_hostname]['RM_USER'] }}:{{ hostvars[inventory_hostname]['RM_USER'] }} {{ hostvars[inventory_hostname]['WORKDIR'] }}
-      become: true
-      become_user: "{{ hostvars[inventory_hostname]['RM_USER'] }}"
+    - name: Chown project dir
+      command: chown -R {{ RM_USER }}:{{ RM_USER }} {{ WORKDIR }}
 
-    - name: create .env
-      ansible.builtin.copy:
-        dest: "{{ hostvars[inventory_hostname]['WORKDIR'] }}/.env"
+    - name: Create .env file
+      copy:
+        dest: "{{ WORKDIR }}/.env"
         content: |
-          TOKEN={{ hostvars[inventory_hostname]['TOKEN'] }}
-          DB_HOST={{ hostvars[inventory_hostname]['DB_HOST'] }}
-          DB_USER={{ hostvars[inventory_hostname]['DB_USER'] }}
-          DB_PASSWORD={{ hostvars[inventory_hostname]['DB_PASSWORD'] }}
-          DB_DATABASE={{ hostvars[inventory_hostname]['DB_DATABASE'] }}
-          RM_HOST={{ hostvars[inventory_hostname]['RM_HOST'] }}
-          RM_PORT={{ hostvars[inventory_hostname]['RM_PORT'] }}
-          RM_USER={{ hostvars[inventory_hostname]['RM_USER'] }}
-          RM_PASSWORD={{ hostvars[inventory_hostname]['RM_PASSWORD'] }}
-      become: yes
+          TOKEN={{ TOKEN }}
+          DB_HOST={{ DB_HOST }}
+          DB_USER={{ DB_USER }}
+          DB_PASSWORD={{ DB_PASSWORD }}
+          DB_DATABASE={{ DB_DATABASE }}
+          RM_HOST={{ RM_HOST }}
+          RM_PORT={{ RM_PORT }}
+          RM_USER={{ RM_USER }}
+          RM_PASSWORD={{ RM_PASSWORD }}
 
-    - name: start TG bot
-      ansible.builtin.shell:
-        cmd: python3 {{ hostvars[inventory_hostname]['WORKDIR'] }}/main.py
-      become: yes
+    - name: Start TG bot
+      shell:
+        cmd: python3 {{ WORKDIR }}/main.py
