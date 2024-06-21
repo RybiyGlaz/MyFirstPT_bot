@@ -8,5 +8,5 @@ sudo apt install python3-pip
 sudo apt install ansible
 export PATH=$PATH:/home/user/.local/bin
 ansible --version)
-5. Создать директории и конфигурационные файлы как в данном репозитории или перенести их на сволю мамашину данной векти данного репозитория с помощью git clone --branch ansible https://github.com/RybiyGlaz/MyFirstPT_bot.git
+5. Создать директории и конфигурационные файлы как в данном репозитории или перенести их на свою мамашину данной векти данного репозитория с помощью git clone --branch ansible https://github.com/RybiyGlaz/MyFirstPT_bot.git
 6. ansible-playbook playboot-tg-bot.yaml
