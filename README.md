@@ -10,7 +10,7 @@ echo \
 sudo apt-get update
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 )
-2. Создать необходимые директории и конфигурационные файлы с содержимым как на данном репозитории или клонируем содержимое данного репозитория себе на машину (git clone https://github.com/RybiyGlaz/MyFirstPT_bot.git)
+2. Создать необходимые директории и конфигурационные файлы с содержимым как на данном репозитории или клонируем содержимое даннной ветки данного репозитория себе на машину (git clone --branch docker https://github.com/RybiyGlaz/MyFirstPT_bot.git)
 3. В директории, в которй у нас находятся файлы из пункта 2, прописываем:
 1) sudo systemctl restart docker 
 2)  docker compose up --build -d
